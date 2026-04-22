@@ -52,7 +52,13 @@ class _HomeScreenState extends State<HomeScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.camera_alt_outlined, color: Colors.white),
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraScreen())),
+                onPressed: () async {
+                  final entry = await Navigator.push<MealEntry>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CameraScreen()),
+                  );
+                  if (entry != null) _addMeal(entry);
+                },
               ),
             ],
           ),
