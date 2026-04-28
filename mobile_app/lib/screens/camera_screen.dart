@@ -1,12 +1,20 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import '../models/food_item.dart';
 
-// Поменяй на IP своего компьютера если запускаешь на телефоне
-const String _backendUrl = 'http://localhost:8000';
+// Автоматически берёт хост откуда загрузилось приложение:
+// - браузер на компьютере → localhost:8000
+// - браузер на телефоне (тот же WiFi) → 192.168.x.x:8000
+String get _backendUrl {
+  if (kIsWeb) {
+    return 'http://${Uri.base.host}:8000';
+  }
+  return 'http://localhost:8000';
+}
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -19,6 +27,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   final _picker = ImagePicker();
   bool _analyzing = false;
   String? _errorMessage;
+  String? _statusMessage;
   Uint8List? _imageBytes;
   Map<String, dynamic>? _result;
 
@@ -47,37 +56,92 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         _imageBytes = bytes;
         _result = null;
         _errorMessage = null;
+        _statusMessage = null;
       });
       await _analyzeImage(bytes);
     } catch (e) {
-      setState(() => _errorMessage = 'Не удалось открыть камеру: $e');
+      setState(() => _errorMessage = 'Не удалось выбрать изображение: $e');
+    }
+  }
+
+  Future<bool> _checkBackend() async {
+    try {
+      final response = await http.get(Uri.parse('$_backendUrl/')).timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 
   Future<void> _analyzeImage(Uint8List bytes) async {
-    setState(() { _analyzing = true; _errorMessage = null; });
-    try {
-      final request = http.MultipartRequest('POST', Uri.parse('$_backendUrl/recognize'));
-      request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'food.jpg'));
-      final streamed = await request.send().timeout(const Duration(seconds: 40));
-      final response = await http.Response.fromStream(streamed);
+    setState(() { _analyzing = true; _errorMessage = null; _statusMessage = 'Проверяю сервер...'; });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        setState(() { _result = data; _analyzing = false; });
-      } else {
-        final err = jsonDecode(response.body);
-        setState(() {
-          _errorMessage = err['detail'] ?? 'Ошибка сервера ${response.statusCode}';
-          _analyzing = false;
-        });
-      }
-    } catch (e) {
+    final backendOk = await _checkBackend();
+    if (!backendOk) {
       setState(() {
-        _errorMessage = 'Не удалось подключиться к серверу.\nПроверьте что backend запущен.';
         _analyzing = false;
+        _statusMessage = null;
+        _errorMessage = 'Backend не запущен.\n\nЗапусти сервер командой:\ncd backend && python -m uvicorn main:app --reload\n\nЕсли тестируешь на телефоне — замени localhost на IP компьютера в camera_screen.dart';
       });
+      return;
     }
+
+    setState(() => _statusMessage = 'Отправляю изображение...');
+
+    // Пробуем до 3 раз (HuggingFace модель может быть не прогрета)
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 1) {
+          setState(() => _statusMessage = 'Модель прогревается, попытка $attempt/3...');
+          await Future.delayed(const Duration(seconds: 5));
+        }
+
+        final request = http.MultipartRequest('POST', Uri.parse('$_backendUrl/recognize'));
+        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'food.jpg'));
+
+        final streamed = await request.send().timeout(const Duration(seconds: 45));
+        final response = await http.Response.fromStream(streamed);
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          setState(() { _result = data; _analyzing = false; _statusMessage = null; });
+          return;
+        }
+
+        if (response.statusCode == 503 || response.statusCode == 504) {
+          // Модель ещё грузится — попробуем снова
+          if (attempt < 3) continue;
+        }
+
+        // Другие ошибки — показываем сразу
+        String detail = 'Ошибка сервера ${response.statusCode}';
+        try {
+          final err = jsonDecode(response.body);
+          detail = err['detail'] ?? detail;
+        } catch (_) {}
+        setState(() { _errorMessage = detail; _analyzing = false; _statusMessage = null; });
+        return;
+
+      } on TimeoutException {
+        if (attempt < 3) continue;
+        setState(() {
+          _errorMessage = 'Превышено время ожидания.\nМодель долго прогревается — попробуй ещё раз через 30 секунд.';
+          _analyzing = false; _statusMessage = null;
+        });
+        return;
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'Ошибка подключения:\n${e.runtimeType}: $e\n\nПроверь что backend запущен на $_backendUrl';
+          _analyzing = false; _statusMessage = null;
+        });
+        return;
+      }
+    }
+
+    setState(() {
+      _errorMessage = 'Модель не успела прогреться. Попробуй ещё раз через 30 секунд.';
+      _analyzing = false; _statusMessage = null;
+    });
   }
 
   void _addToDiary() {
@@ -111,9 +175,9 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         children: [
           _buildBackground(),
           if (_analyzing) _buildAnalyzingOverlay(),
-          if (_errorMessage != null && !_analyzing) _buildErrorBanner(),
-          if (_result != null && !_analyzing) _buildResultSheet(),
-          if (!_analyzing && _result == null) _buildButtons(),
+          if (!_analyzing && _errorMessage != null) _buildErrorBanner(),
+          if (!_analyzing && _result != null) _buildResultSheet(),
+          if (!_analyzing && _result == null && _errorMessage == null) _buildButtons(),
         ],
       ),
     );
@@ -200,15 +264,19 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   Widget _buildAnalyzingOverlay() {
     return Container(
       color: Colors.black54,
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: Color(0xFF4CAF82)),
-            SizedBox(height: 20),
-            Text('Анализирую блюдо...', style: TextStyle(color: Colors.white, fontSize: 18)),
-            SizedBox(height: 8),
-            Text('ML модель обрабатывает изображение', style: TextStyle(color: Colors.white54, fontSize: 13)),
+            const CircularProgressIndicator(color: Color(0xFF4CAF82)),
+            const SizedBox(height: 20),
+            const Text('Анализирую блюдо...', style: TextStyle(color: Colors.white, fontSize: 18)),
+            const SizedBox(height: 8),
+            Text(
+              _statusMessage ?? 'ML модель обрабатывает изображение',
+              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -233,10 +301,12 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
             const SizedBox(height: 12),
             Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15)),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => setState(() { _errorMessage = null; _imageBytes = null; }),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => setState(() { _errorMessage = null; _imageBytes = null; _statusMessage = null; }),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Попробовать снова'),
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF82), foregroundColor: Colors.white),
-              child: const Text('Попробовать снова'),
             ),
           ],
         ),
