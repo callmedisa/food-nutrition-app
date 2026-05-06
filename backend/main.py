@@ -4,7 +4,8 @@ import requests
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from nutrition_data import get_nutrition
-from PIL import Image
+from PIL import Image, ImageEnhance
+from collections import defaultdict
 
 app = FastAPI(title="NutriScan API")
 
@@ -17,7 +18,6 @@ app.add_middleware(
 
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 
-# Локальная модель — загружается один раз при первом запросе, кешируется
 _classifier = None
 
 def get_classifier():
@@ -28,10 +28,63 @@ def get_classifier():
         _classifier = pipeline(
             "image-classification",
             model="nateraw/food",
-            top_k=5,
+            top_k=10,
         )
         print("Модель загружена и готова к работе.")
     return _classifier
+
+
+def preprocess(image: Image.Image) -> Image.Image:
+    """Нормализуем размер и слегка усиливаем контраст."""
+    image = image.convert("RGB")
+    # Оптимальный размер для ViT-моделей
+    image = image.resize((384, 384), Image.LANCZOS)
+    # Лёгкое усиление контраста помогает модели различать текстуры
+    image = ImageEnhance.Contrast(image).enhance(1.15)
+    image = ImageEnhance.Sharpness(image).enhance(1.1)
+    return image
+
+
+def make_crops(image: Image.Image) -> list[Image.Image]:
+    """5 кропов: центр + 4 угла. Ансамбль кропов повышает точность."""
+    w, h = image.size
+    cx, cy = w // 2, h // 2
+    crop_size = int(min(w, h) * 0.82)
+    half = crop_size // 2
+
+    centers = [
+        (cx, cy),                          # центр
+        (half, half),                      # верх-лево
+        (w - half, half),                  # верх-право
+        (half, h - half),                  # низ-лево
+        (w - half, h - half),              # низ-право
+    ]
+    crops = []
+    for x, y in centers:
+        left  = max(0, x - half)
+        upper = max(0, y - half)
+        right = min(w, x + half)
+        lower = min(h, y + half)
+        crop = image.crop((left, upper, right, lower)).resize((384, 384), Image.LANCZOS)
+        crops.append(crop)
+    return crops
+
+
+def ensemble_predict(clf, image: Image.Image) -> list[dict]:
+    """Прогоняем все кропы через модель и усредняем оценки."""
+    crops = make_crops(image)
+    scores: dict[str, float] = defaultdict(float)
+
+    for crop in crops:
+        preds = clf(crop)
+        for p in preds:
+            scores[p["label"]] += p["score"]
+
+    # Нормализуем (делим на количество кропов)
+    n = len(crops)
+    averaged = [{"label": lbl, "score": s / n} for lbl, s in scores.items()]
+    averaged.sort(key=lambda x: x["score"], reverse=True)
+    return averaged
 
 
 @app.get("/")
@@ -45,7 +98,7 @@ async def recognize_food(file: UploadFile = File(...)):
 
     results = None
 
-    # 1. Сначала пробуем HuggingFace Inference API (быстро, не требует памяти)
+    # 1. Сначала пробуем HuggingFace Inference API
     hf_models = [
         "https://api-inference.huggingface.co/models/eslamxm/vit-base-food101",
         "https://api-inference.huggingface.co/models/skylord/swin-finetuned-food101",
@@ -63,13 +116,13 @@ async def recognize_food(file: UploadFile = File(...)):
         except Exception:
             continue
 
-    # 2. Если API недоступны — запускаем модель локально
+    # 2. Локальная модель с ансамблем кропов
     if results is None:
         try:
             clf = get_classifier()
-            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            local_results = clf(image)
-            results = [{"label": r["label"], "score": r["score"]} for r in local_results]
+            image = Image.open(io.BytesIO(image_bytes))
+            image = preprocess(image)
+            results = ensemble_predict(clf, image)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Ошибка локальной модели: {str(e)}")
 
@@ -93,7 +146,11 @@ async def recognize_food(file: UploadFile = File(...)):
             "carbs":    nutrition["carbs"],
         },
         "all_predictions": [
-            {"label": r["label"], "confidence": round(r["score"] * 100, 1)}
+            {
+                "label": r["label"],
+                "confidence": round(r["score"] * 100, 1),
+                "nutrition": get_nutrition(r["label"]),
+            }
             for r in results[:3]
         ],
     }

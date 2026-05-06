@@ -30,6 +30,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   String? _statusMessage;
   Uint8List? _imageBytes;
   Map<String, dynamic>? _result;
+  int _selectedIndex = 0;
 
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
@@ -57,6 +58,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
         _result = null;
         _errorMessage = null;
         _statusMessage = null;
+        _selectedIndex = 0;
       });
       await _analyzeImage(bytes);
     } catch (e) {
@@ -146,10 +148,12 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
 
   void _addToDiary() {
     if (_result == null) return;
-    final n = _result!['nutrition'] as Map<String, dynamic>;
+    final predictions = _result!['all_predictions'] as List<dynamic>;
+    final selected = predictions[_selectedIndex];
+    final n = selected['nutrition'] as Map<String, dynamic>;
     final food = FoodItem(
-      id: _result!['label'],
-      name: _result!['label'],
+      id: selected['label'],
+      name: selected['label'],
       nameRu: n['nameRu'],
       calories: (n['calories'] as num).toDouble(),
       protein: (n['protein'] as num).toDouble(),
@@ -315,16 +319,17 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   }
 
   Widget _buildResultSheet() {
-    final n = _result!['nutrition'] as Map<String, dynamic>;
-    final confidence = _result!['confidence'];
     final predictions = _result!['all_predictions'] as List<dynamic>;
+    final selected = predictions[_selectedIndex];
+    final n = selected['nutrition'] as Map<String, dynamic>;
+    final confidence = selected['confidence'];
 
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -333,41 +338,43 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+
+            // Нутриенты выбранного блюда
             Row(
               children: [
-                Text(n['emoji'] ?? '🍽️', style: const TextStyle(fontSize: 40)),
+                Text(n['emoji'] ?? '🍽️', style: const TextStyle(fontSize: 36)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Распознано:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                      Text(n['nameRu'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                      Text('Точность: $confidence%', style: TextStyle(color: Colors.green[600], fontSize: 13)),
+                      const Text('Распознано:', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text(n['nameRu'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 19)),
+                      Row(
+                        children: [
+                          Icon(Icons.verified, size: 14, color: confidence >= 70 ? Colors.green[600] : Colors.orange[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Точность: $confidence%',
+                            style: TextStyle(
+                              color: confidence >= 70 ? Colors.green[600] : Colors.orange[600],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
-            if (predictions.length > 1) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: predictions.skip(1).take(2).map((p) =>
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Chip(
-                      label: Text('${p['label'].replaceAll('_', ' ')} (${p['confidence']}%)', style: const TextStyle(fontSize: 11)),
-                      backgroundColor: Colors.grey[100],
-                    ),
-                  )
-                ).toList(),
-              ),
-            ],
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFFF5F7FA), borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: const Color(0xFFF5F7FA), borderRadius: BorderRadius.circular(12)),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -378,24 +385,97 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            const Text('на 100 г продукта', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
+            const Text('на 100 г продукта', style: TextStyle(color: Colors.grey, fontSize: 11)),
+
+            // Варианты для выбора — только если точность < 90%
+            if (predictions.length > 1 && (confidence as num) < 90) ...[
+              const SizedBox(height: 14),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Не то блюдо? Выбери правильный вариант:', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ),
+              const SizedBox(height: 8),
+              // Сортируем по убыванию точности, берём топ-3
+              ...(() {
+                final sorted = List<MapEntry<int, dynamic>>.from(predictions.asMap().entries.toList())
+                  ..sort((a, b) => (b.value['confidence'] as num).compareTo(a.value['confidence'] as num));
+                return sorted.take(3).map((entry) {
+                  final i = entry.key;
+                  final p = entry.value;
+                  final pn = p['nutrition'] as Map<String, dynamic>;
+                  final isSelected = i == _selectedIndex;
+                  final pct = p['confidence'] as num;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = i),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFE8F5EE) : Colors.grey[50],
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF4CAF82) : Colors.grey.shade200,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(pn['emoji'] ?? '🍽️', style: const TextStyle(fontSize: 22)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              pn['nameRu'],
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 14,
+                                color: isSelected ? const Color(0xFF2E7D5E) : Colors.black87,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isSelected ? const Color(0xFF4CAF82) : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$pct%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? Colors.white : Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                          if (isSelected) ...[
+                            const SizedBox(width: 6),
+                            const Icon(Icons.check_circle, color: Color(0xFF4CAF82), size: 18),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList();
+              })(),
+            ],
+
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => setState(() { _result = null; _imageBytes = null; }),
+                    onPressed: () => setState(() { _result = null; _imageBytes = null; _selectedIndex = 0; }),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF4CAF82),
                       side: const BorderSide(color: Color(0xFF4CAF82)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text('Повторить'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
@@ -403,7 +483,7 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4CAF82),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text('Добавить в дневник', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -411,7 +491,6 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
                 ),
               ],
             ),
-            const SizedBox(height: 8),
           ],
         ),
       ),
