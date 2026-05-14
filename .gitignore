@@ -5,3 +5,4 @@ dist/
 build/
 *.log
 __pycache__/
+backend/kazakh_dataset/

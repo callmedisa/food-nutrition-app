@@ -37,6 +37,26 @@ class FoodDatabase {
     // Орехи и бобовые
     FoodItem(id: '23', name: 'Almonds', nameRu: 'Миндаль', calories: 579, protein: 21.2, fat: 49.9, carbs: 21.6, category: 'nut', emoji: '🌰'),
     FoodItem(id: '24', name: 'Lentils (cooked)', nameRu: 'Чечевица варёная', calories: 116, protein: 9.0, fat: 0.4, carbs: 20.1, category: 'legume', emoji: '🫘'),
+
+    // Казахская кухня
+    FoodItem(id: 'kz1', name: 'Beshbarmak', nameRu: 'Бешбармак', calories: 248, protein: 15.2, fat: 11.8, carbs: 20.4, category: 'kazakh', emoji: '🍖'),
+    FoodItem(id: 'kz2', name: 'Kuirdak', nameRu: 'Куырдак', calories: 218, protein: 14.0, fat: 15.2, carbs: 5.1, category: 'kazakh', emoji: '🥘'),
+    FoodItem(id: 'kz3', name: 'Bauyrsak', nameRu: 'Баурсак', calories: 378, protein: 7.2, fat: 17.8, carbs: 46.3, category: 'kazakh', emoji: '🟡'),
+    FoodItem(id: 'kz4', name: 'Lagman', nameRu: 'Лагман', calories: 138, protein: 7.8, fat: 5.6, carbs: 14.2, category: 'kazakh', emoji: '🍜'),
+    FoodItem(id: 'kz5', name: 'Manty', nameRu: 'Манты', calories: 198, protein: 10.2, fat: 9.8, carbs: 18.5, category: 'kazakh', emoji: '🥟'),
+    FoodItem(id: 'kz6', name: 'Samsa', nameRu: 'Самса', calories: 298, protein: 10.4, fat: 14.6, carbs: 30.2, category: 'kazakh', emoji: '🫓'),
+    FoodItem(id: 'kz7', name: 'Sorpa', nameRu: 'Сорпа', calories: 48, protein: 4.2, fat: 2.1, carbs: 2.4, category: 'kazakh', emoji: '🍲'),
+    FoodItem(id: 'kz8', name: 'Kazy', nameRu: 'Қазы', calories: 422, protein: 15.8, fat: 38.4, carbs: 1.2, category: 'kazakh', emoji: '🌭'),
+    FoodItem(id: 'kz9', name: 'Naryn', nameRu: 'Нарын', calories: 196, protein: 12.4, fat: 9.6, carbs: 14.8, category: 'kazakh', emoji: '🍝'),
+    FoodItem(id: 'kz10', name: 'Shelpek', nameRu: 'Шелпек', calories: 302, protein: 6.1, fat: 11.8, carbs: 42.6, category: 'kazakh', emoji: '🫓'),
+    FoodItem(id: 'kz11', name: 'Plov', nameRu: 'Плов', calories: 222, protein: 8.2, fat: 10.4, carbs: 25.8, category: 'kazakh', emoji: '🍛'),
+    FoodItem(id: 'kz12', name: 'Shashlik', nameRu: 'Шашлык', calories: 218, protein: 22.1, fat: 13.6, carbs: 1.0, category: 'kazakh', emoji: '🍢'),
+    FoodItem(id: 'kz13', name: 'Kumiss', nameRu: 'Қымыз', calories: 50, protein: 2.1, fat: 1.9, carbs: 5.2, category: 'kazakh', emoji: '🥛'),
+    FoodItem(id: 'kz14', name: 'Shubat', nameRu: 'Шұбат', calories: 58, protein: 3.2, fat: 2.8, carbs: 4.4, category: 'kazakh', emoji: '🥛'),
+    FoodItem(id: 'kz15', name: 'Kurt', nameRu: 'Құрт', calories: 260, protein: 25.4, fat: 8.2, carbs: 18.6, category: 'kazakh', emoji: '⚪'),
+    FoodItem(id: 'kz16', name: 'Zhent', nameRu: 'Жент', calories: 388, protein: 8.4, fat: 14.2, carbs: 56.8, category: 'kazakh', emoji: '🟤'),
+    FoodItem(id: 'kz17', name: 'Irimshik', nameRu: 'Іріімшік', calories: 168, protein: 14.8, fat: 9.2, carbs: 6.4, category: 'kazakh', emoji: '🧀'),
+    FoodItem(id: 'kz18', name: 'Zhayma', nameRu: 'Жайма (тесто для бешбармака)', calories: 285, protein: 9.2, fat: 2.8, carbs: 56.4, category: 'kazakh', emoji: '🫓'),
   ];
 
   static List<FoodItem> search(String query) {

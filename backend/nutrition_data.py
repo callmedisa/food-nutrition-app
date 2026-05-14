@@ -104,6 +104,32 @@ FOOD_101_NUTRITION = {
 
 DEFAULT_NUTRITION = {"nameRu": "Неизвестное блюдо", "emoji": "🍽️", "calories": 200, "protein": 10.0, "fat": 8.0, "carbs": 25.0}
 
+KAZAKH_NUTRITION = {
+    "beshbarmak": {"nameRu": "Бешбармак",              "emoji": "🍖", "calories": 248, "protein": 15.2, "fat": 11.8, "carbs": 20.4},
+    "bauyrsak":   {"nameRu": "Баурсак",                "emoji": "🟡", "calories": 378, "protein":  7.2, "fat": 17.8, "carbs": 46.3},
+    "kuirdak":    {"nameRu": "Куырдак",                "emoji": "🥘", "calories": 218, "protein": 14.0, "fat": 15.2, "carbs":  5.1},
+    "manty":      {"nameRu": "Манты",                  "emoji": "🥟", "calories": 198, "protein": 10.2, "fat":  9.8, "carbs": 18.5},
+    "samsa":      {"nameRu": "Самса",                  "emoji": "🫓", "calories": 298, "protein": 10.4, "fat": 14.6, "carbs": 30.2},
+    "lagman":     {"nameRu": "Лагман",                 "emoji": "🍜", "calories": 138, "protein":  7.8, "fat":  5.6, "carbs": 14.2},
+    "sorpa":      {"nameRu": "Сорпа",                  "emoji": "🍲", "calories":  48, "protein":  4.2, "fat":  2.1, "carbs":  2.4},
+    "kazy":       {"nameRu": "Қазы",                   "emoji": "🌭", "calories": 422, "protein": 15.8, "fat": 38.4, "carbs":  1.2},
+    "naryn":      {"nameRu": "Нарын",                  "emoji": "🍝", "calories": 196, "protein": 12.4, "fat":  9.6, "carbs": 14.8},
+    "shelpek":    {"nameRu": "Шелпек",                 "emoji": "🫓", "calories": 302, "protein":  6.1, "fat": 11.8, "carbs": 42.6},
+    "plov":       {"nameRu": "Плов",                   "emoji": "🍛", "calories": 222, "protein":  8.2, "fat": 10.4, "carbs": 25.8},
+    "shashlik":   {"nameRu": "Шашлык",                 "emoji": "🍢", "calories": 218, "protein": 22.1, "fat": 13.6, "carbs":  1.0},
+    "kurt":       {"nameRu": "Құрт",                   "emoji": "⚪", "calories": 260, "protein": 25.4, "fat":  8.2, "carbs": 18.6},
+    "irimshik":   {"nameRu": "Іріімшік",               "emoji": "🧀", "calories": 168, "protein": 14.8, "fat":  9.2, "carbs":  6.4},
+}
+
 
 def get_nutrition(label: str) -> dict:
-    return FOOD_101_NUTRITION.get(label, DEFAULT_NUTRITION)
+    # Сначала проверяем казахские блюда (метки от kazakh_model)
+    key = label.lower().replace(" ", "_").replace("-", "_")
+    if key in KAZAKH_NUTRITION:
+        return KAZAKH_NUTRITION[key]
+    if label in KAZAKH_NUTRITION:
+        return KAZAKH_NUTRITION[label]
+    # Затем Food-101
+    if label in FOOD_101_NUTRITION:
+        return FOOD_101_NUTRITION[label]
+    return FOOD_101_NUTRITION.get(key, DEFAULT_NUTRITION)
