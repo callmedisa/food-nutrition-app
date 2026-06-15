@@ -1,95 +1,123 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'models/user_profile.dart';
-import 'services/database_service.dart';
-import 'screens/home_screen.dart';
-import 'screens/stats_screen.dart';
-import 'screens/profile_screen.dart';
+import 'package:food_nutrition_app/l10n/app_localizations.dart';
+
+import 'core/theme/app_theme.dart';
+import 'features/diary/presentation/screens/home_screen.dart';
+import 'features/diary/presentation/screens/stats_screen.dart';
+import 'features/profile/presentation/screens/profile_screen.dart';
+import 'providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('ru', null);
-  runApp(const NutriScanApp());
+  await initializeDateFormatting();
+  runApp(const ProviderScope(child: NutriScanApp()));
 }
 
-class NutriScanApp extends StatelessWidget {
+// NutriScanApp — корневой виджет, ConsumerWidget слушает LocaleNotifier
+// для смены языка без перезапуска приложения.
+class NutriScanApp extends ConsumerWidget {
   const NutriScanApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localeAsync = ref.watch(localeNotifierProvider);
+    final locale = localeAsync.valueOrNull ?? const Locale('ru');
+
     return MaterialApp(
       title: 'NutriScan',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4CAF82),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        cardTheme: CardThemeData(
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-      ),
-      home: const RootScreen(),
+
+      // Светлая и тёмная темы (переключается по системному режиму устройства)
+      theme:      AppTheme.light,
+      darkTheme:  AppTheme.dark,
+      themeMode:  ThemeMode.system,
+
+      // Трёхязычный интерфейс: RU / KK / EN
+      locale: locale,
+      supportedLocales: const [
+        Locale('ru'),
+        Locale('kk'),
+        Locale('en'),
+      ],
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
+      home: const SplashScreen(),
     );
   }
 }
 
-class RootScreen extends StatefulWidget {
+// SplashScreen показывается при старте (~280 мс), пока загружается профиль.
+// После загрузки автоматически переходит на RootScreen.
+class SplashScreen extends ConsumerWidget {
+  const SplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<dynamic>>(profileNotifierProvider, (_, next) {
+      if (!next.isLoading && context.mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RootScreen()),
+        );
+      }
+    });
+
+    return const Scaffold(
+      backgroundColor: Color(0xFF4CAF82),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.restaurant_menu, color: Colors.white, size: 80),
+            SizedBox(height: 16),
+            Text(
+              'NutriScan',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Умный счётчик калорий',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            SizedBox(height: 48),
+            CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// RootScreen — BottomNavigationBar с тремя вкладками
+class RootScreen extends ConsumerStatefulWidget {
   const RootScreen({super.key});
 
   @override
-  State<RootScreen> createState() => _RootScreenState();
+  ConsumerState<RootScreen> createState() => _RootScreenState();
 }
 
-class _RootScreenState extends State<RootScreen> {
+class _RootScreenState extends ConsumerState<RootScreen> {
   int _tab = 0;
-  UserProfile? _profile;
-  bool _profileLoaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadProfile();
-  }
-
-  Future<void> _loadProfile() async {
-    final p = await DatabaseService.getProfile();
-    if (mounted) setState(() { _profile = p; _profileLoaded = true; });
-  }
-
-  void _onProfileSaved(UserProfile p) {
-    setState(() => _profile = p);
-  }
 
   @override
   Widget build(BuildContext context) {
-    if (!_profileLoaded) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF4CAF82))),
-      );
-    }
-
-    // First launch — no profile yet: show profile setup
-    if (_profile == null && _tab != 2) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ProfileScreen(
-            initial: null,
-            onSaved: (p) {
-              _onProfileSaved(p);
-              setState(() => _tab = 0);
-            },
-          ),
-        ));
-      });
-    }
+    final l = AppLocalizations.of(context)!;
 
     final screens = [
-      HomeScreen(profile: _profile),
-      StatsScreen(profile: _profile),
+      const HomeScreen(),
+      const StatsScreen(),
     ];
 
     return Scaffold(
@@ -101,34 +129,29 @@ class _RootScreenState extends State<RootScreen> {
         selectedIndex: _tab,
         onDestinationSelected: (i) {
           if (i == 2) {
-            // Profile tab — open as a page (not IndexedStack)
-            Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => ProfileScreen(
-                initial: _profile,
-                onSaved: _onProfileSaved,
-              ),
-            ));
+            Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfileScreen()));
             return;
           }
           setState(() => _tab = i);
         },
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         indicatorColor: const Color(0xFF4CAF82).withOpacity(0.15),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: Color(0xFF4CAF82)),
-            label: 'Главная',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home, color: Color(0xFF4CAF82)),
+            label: l.navHome,
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart, color: Color(0xFF4CAF82)),
-            label: 'Статистика',
+            icon: const Icon(Icons.bar_chart_outlined),
+            selectedIcon: const Icon(Icons.bar_chart, color: Color(0xFF4CAF82)),
+            label: l.navStats,
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outlined),
-            selectedIcon: Icon(Icons.person, color: Color(0xFF4CAF82)),
-            label: 'Профиль',
+            icon: const Icon(Icons.person_outlined),
+            selectedIcon: const Icon(Icons.person, color: Color(0xFF4CAF82)),
+            label: l.navProfile,
           ),
         ],
       ),

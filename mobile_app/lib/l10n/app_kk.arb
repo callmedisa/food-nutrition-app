@@ -1,0 +1,110 @@
+{
+  "@@locale": "kk",
+
+  "appTitle": "NutriScan",
+
+  "navHome": "Басты",
+  "navStats": "Статистика",
+  "navProfile": "Профиль",
+
+  "labelCalories": "Калориялар",
+  "labelProtein": "Белоктар",
+  "labelFat": "Майлар",
+  "labelCarbs": "Көмірсулар",
+  "labelKcal": "ккал",
+  "labelGrams": "г",
+  "labelPer100g": "100 г өнімге",
+
+  "homeCaloriesOf": "{goal} ккалдан",
+  "@homeCaloriesOf": {
+    "placeholders": { "goal": { "type": "int" } }
+  },
+  "homeRemaining": "Қалды: {n} ккал",
+  "@homeRemaining": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "homeSetupProfile": "Профильді баптаңыз ▸",
+  "homeMeals": "Тамақтану",
+  "homeMealsCount": "{n} жазба",
+  "@homeMealsCount": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "homeEmpty": "Тағам жазбалары жоқ",
+  "homeEmptyHint": "«Тағам қосу» немесе\nфотосурет түсіріңіз",
+  "homeAddFood": "Тағам қосу",
+  "homeMacroOf": "{goal} г-нан",
+  "@homeMacroOf": {
+    "placeholders": { "goal": { "type": "int" } }
+  },
+
+  "cameraTitle": "Тағамды тану",
+  "cameraHint": "Камераны тағамға\nбағыттаңыз",
+  "cameraAnalyzing": "Тағам талдануда...",
+  "cameraProcessing": "ML-модель суретті өңдеуде",
+  "cameraCheckServer": "Сервер тексерілуде...",
+  "cameraSending": "Сурет жіберілуде...",
+  "cameraWarmingUp": "Модель дайындалуда, әрекет {n}/3...",
+  "@cameraWarmingUp": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "cameraRecognized": "Танылды:",
+  "cameraConfidence": "Дәлдік: {n}%",
+  "@cameraConfidence": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "cameraAlternatives": "Дұрыс емес пе? Дұрысын таңдаңыз:",
+  "cameraTryAgain": "Қайталау",
+  "cameraAddToDiary": "Күнделікке қосу",
+  "cameraTakePhoto": "Фотосурет түсіру",
+  "cameraGallery": "Галереядан таңдау",
+  "cameraErrorNoBackend": "Backend іске қосылмаған.\n\nСерверді іске қосыңыз:\ncd backend && python -m uvicorn main:app --reload",
+  "cameraErrorTimeout": "Уақыт асып кетті. 30 секундтан кейін қайталаңыз.",
+  "cameraErrorConnection": "Қосылу қатесі. Backend іске қосылғанын тексеріңіз.",
+  "cameraRetry": "Қайталап көру",
+  "cameraOfflineMode": "Офлайн режимі",
+
+  "statsTitle": "Статистика",
+  "statsAverage": "Орташа",
+  "statsGoal": "Мақсат",
+  "statsDaysLogged": "Жазылған\nкүндер",
+  "statsChartTitle": "7 күн бойы калориялар",
+  "statsOnTrack": "Қалыпты",
+  "statsOverGoal": "Асып кетті",
+  "statsByDay": "Күндер бойынша",
+  "statsToday": "Бүгін",
+
+  "profileTitle": "Профиль",
+  "profileSave": "Сақтау",
+  "profilePersonal": "Жеке деректер",
+  "profileName": "Аты",
+  "profileAge": "Жасы",
+  "profileWeight": "Салмақ (кг)",
+  "profileHeight": "Бойы (см)",
+  "profileMale": "Ер",
+  "profileFemale": "Әйел",
+  "profileActivity": "Белсенділік деңгейі",
+  "profileCalorieGoal": "Калория нормасы:",
+  "profileActivitySedentary": "Отырықшы өмір салты",
+  "profileActivityLight": "Жеңіл белсенділік (аптасына 1-3 рет)",
+  "profileActivityModerate": "Орташа (аптасына 3-5 рет)",
+  "profileActivityActive": "Жоғары (аптасына 6-7 рет)",
+  "profileActivityVeryActive": "Өте жоғары (спортшы)",
+
+  "settingsLanguage": "Тіл",
+  "settingsLangRu": "Русский",
+  "settingsLangKk": "Қазақша",
+  "settingsLangEn": "English",
+  "settingsTheme": "Тақырып",
+  "settingsThemeSystem": "Жүйелік",
+  "settingsThemeLight": "Жарық",
+  "settingsThemeDark": "Күңгірт",
+
+  "addFoodTitle": "Тағам қосу",
+  "addFoodSearch": "Өнімді іздеу...",
+  "addFoodServing": "Порция (г)",
+  "addFoodAdd": "Күнделікке қосу",
+  "addFoodSelectFirst": "Өнімді таңдаңыз",
+
+  "validRequired": "Міндетті өріс",
+  "validPositive": "Оң сан енгізіңіз"
+}

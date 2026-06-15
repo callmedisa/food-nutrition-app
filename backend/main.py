@@ -5,6 +5,7 @@ import json
 import requests
 import torch
 import torch.nn as nn
+import math
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from nutrition_data import get_nutrition
@@ -26,9 +27,18 @@ app.add_middleware(
 HF_TOKEN        = os.getenv("HF_TOKEN", "")
 KAZAKH_MODEL    = os.path.join(os.path.dirname(__file__), "kazakh_model.pth")
 KAZAKH_CLASSES  = os.path.join(os.path.dirname(__file__), "kazakh_classes.json")
-KAZAKH_THRESHOLD = 0.70   # если казахская модель даёт >70% — доверяем ей
 
-# ── Казахская модель ─────────────────────────────────────
+# Казахская модель уверена → показываем её результат
+KAZAKH_HIGH_THRESHOLD   = 0.70
+# Казахская модель умеренно уверена → добавляем как альтернативу, но Food-101 — главный
+KAZAKH_MIN_THRESHOLD    = 0.40
+# Минимальная уверенность Food-101 для показа результата (ниже → "не еда")
+FOOD101_MIN_CONFIDENCE  = 0.12
+# Минимальная энтропия топа: если модель размазала всё равномерно → не еда
+MIN_TOP_SCORE_FOR_FOOD  = 0.10
+
+
+# ── Казахская модель ──────────────────────────────────────────────────────────
 
 _kazakh_model   = None
 _kazakh_classes = None
@@ -39,6 +49,7 @@ _kazakh_tf      = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
+
 
 def get_kazakh_model():
     global _kazakh_model, _kazakh_classes, _kazakh_device
@@ -64,7 +75,7 @@ def get_kazakh_model():
 
 
 def predict_kazakh(image: Image.Image) -> dict | None:
-    """Возвращает {'label': ..., 'score': ...} если модель есть, иначе None."""
+    """Возвращает {'label': ..., 'score': float, 'all_probs': list[float]} или None."""
     model, classes, device = get_kazakh_model()
     if model is None:
         return None
@@ -72,15 +83,37 @@ def predict_kazakh(image: Image.Image) -> dict | None:
     tensor = _kazakh_tf(img).unsqueeze(0).to(device)
     with torch.no_grad():
         logits = model(tensor)
-        probs  = torch.softmax(logits, dim=1)[0]
-    best_idx   = probs.argmax().item()
-    best_score = probs[best_idx].item()
-    return {"label": classes[best_idx], "score": best_score}
+        probs  = torch.softmax(logits, dim=1)[0].cpu().tolist()
+    best_idx   = max(range(len(probs)), key=lambda i: probs[i])
+    best_score = probs[best_idx]
+    return {
+        "label":     classes[best_idx],
+        "score":     best_score,
+        "all_probs": probs,
+        "classes":   classes,
+    }
 
 
-# ── Основная (Food-101) модель ────────────────────────────
+def kazakh_looks_like_food(kazakh_result: dict) -> bool:
+    """
+    Проверяет, "уверена" ли казахская модель что это вообще похоже на еду.
+    Метрика: энтропия вероятностей.
+    Если распределение почти равномерное — это не казахское блюдо.
+    Max возможная энтропия для 14 классов = log2(14) ≈ 3.81 бит.
+    Если энтропия > 3.0 — модель ничего не узнаёт → не казахская еда.
+    """
+    probs = kazakh_result["all_probs"]
+    entropy = -sum(p * math.log2(p + 1e-9) for p in probs)
+    max_entropy = math.log2(len(probs))
+    # Нормализованная энтропия: 0.0 (полная уверенность) → 1.0 (полная неопределённость)
+    norm_entropy = entropy / max_entropy
+    return norm_entropy < 0.85  # уверена хотя бы чуть-чуть
+
+
+# ── Food-101 модель ───────────────────────────────────────────────────────────
 
 _classifier = None
+
 
 def get_classifier():
     global _classifier
@@ -131,7 +164,18 @@ def ensemble_predict(clf, image: Image.Image) -> list[dict]:
     return averaged
 
 
-# ── Endpoints ─────────────────────────────────────────────
+def looks_like_food(results: list[dict]) -> bool:
+    """
+    Проверяет, является ли изображение едой по результатам Food-101 модели.
+    Если топ-1 результат < MIN_TOP_SCORE_FOR_FOOD → скорее всего не еда.
+    """
+    if not results:
+        return False
+    top_score = results[0].get("score", 0)
+    return top_score >= MIN_TOP_SCORE_FOR_FOOD
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def root():
@@ -148,9 +192,13 @@ async def recognize_food(file: UploadFile = File(...)):
     image_bytes = await file.read()
     image_pil   = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    # 1. Казахская специализированная модель
+    # ── Шаг 1: Казахская специализированная модель ────────────────────────────
     kazakh = predict_kazakh(image_pil)
-    if kazakh and kazakh["score"] >= KAZAKH_THRESHOLD:
+
+    # ИСПРАВЛЕНИЕ: казахская модель срабатывает ТОЛЬКО если:
+    #   а) уверенность выше высокого порога (0.70), И
+    #   б) распределение вероятностей не равномерное (модель что-то узнаёт)
+    if kazakh and kazakh["score"] >= KAZAKH_HIGH_THRESHOLD and kazakh_looks_like_food(kazakh):
         label      = kazakh["label"]
         confidence = round(kazakh["score"] * 100, 1)
         nutrition  = get_nutrition(label)
@@ -167,13 +215,14 @@ async def recognize_food(file: UploadFile = File(...)):
                 "carbs":    nutrition["carbs"],
             },
             "all_predictions": [{
-                "label": label,
+                "label":      label,
                 "confidence": confidence,
-                "nutrition": nutrition,
+                "source":     "kazakh_model",
+                "nutrition":  nutrition,
             }],
         }
 
-    # 2. HuggingFace Inference API
+    # ── Шаг 2: Food-101 через HuggingFace API или локальную модель ────────────
     results = None
     hf_models = [
         "https://api-inference.huggingface.co/models/eslamxm/vit-base-food101",
@@ -191,7 +240,7 @@ async def recognize_food(file: UploadFile = File(...)):
         except Exception:
             continue
 
-    # 3. Локальная Food-101 модель с ансамблем
+    # Локальная модель с ансамблем 5 кропов
     if results is None:
         try:
             clf    = get_classifier()
@@ -203,10 +252,41 @@ async def recognize_food(file: UploadFile = File(...)):
     if not results:
         raise HTTPException(status_code=500, detail="Не удалось распознать блюдо")
 
-    # Если казахская модель дала результат, но ниже порога — добавляем его в топ
-    if kazakh:
+    # ── Шаг 3: Проверка "это вообще еда?" ────────────────────────────────────
+    # Если топ-1 Food-101 уверен меньше чем на MIN_TOP_SCORE_FOR_FOOD (10%),
+    # значит модель видит размытое распределение → скорее всего не еда.
+    if not looks_like_food(results):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "На фото не удалось распознать еду. "
+                "Убедитесь, что на снимке блюдо или продукт питания."
+            ),
+        )
+
+    # ── Шаг 4: Дополнительная проверка по уверенности ────────────────────────
+    top_score = results[0].get("score", 0)
+    if top_score < FOOD101_MIN_CONFIDENCE:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Изображение распознано с низкой уверенностью ({round(top_score*100)}%). "
+                "Попробуйте сфотографировать блюдо крупнее и при хорошем освещении."
+            ),
+        )
+
+    # ── Шаг 5: Формируем ответ ────────────────────────────────────────────────
+    # ИСПРАВЛЕНИЕ: казахская модель добавляется как альтернатива ТОЛЬКО если:
+    #   а) её уверенность выше умеренного порога (0.40), И
+    #   б) распределение не равномерное (модель что-то узнаёт)
+    # Она НЕ вставляется первой — Food-101 остаётся главным.
+    if (kazakh
+            and kazakh["score"] >= KAZAKH_MIN_THRESHOLD
+            and kazakh_looks_like_food(kazakh)):
         kaz_entry = {"label": kazakh["label"], "score": kazakh["score"]}
-        results = [kaz_entry] + [r for r in results if r.get("label") != kazakh["label"]]
+        # Добавляем только если этого класса ещё нет в топе
+        if not any(r.get("label") == kaz_entry["label"] for r in results[:3]):
+            results = results[:2] + [kaz_entry] + results[2:]
 
     top        = results[0]
     label      = top.get("label", "unknown")
@@ -227,9 +307,10 @@ async def recognize_food(file: UploadFile = File(...)):
         },
         "all_predictions": [
             {
-                "label": r["label"],
+                "label":      r["label"],
                 "confidence": round(r["score"] * 100, 1),
-                "nutrition": get_nutrition(r["label"]),
+                "source":     "food101_model",
+                "nutrition":  get_nutrition(r["label"]),
             }
             for r in results[:3]
         ],

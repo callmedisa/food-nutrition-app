@@ -1,0 +1,110 @@
+{
+  "@@locale": "ru",
+
+  "appTitle": "NutriScan",
+
+  "navHome": "Главная",
+  "navStats": "Статистика",
+  "navProfile": "Профиль",
+
+  "labelCalories": "Калории",
+  "labelProtein": "Белки",
+  "labelFat": "Жиры",
+  "labelCarbs": "Углеводы",
+  "labelKcal": "ккал",
+  "labelGrams": "г",
+  "labelPer100g": "на 100 г продукта",
+
+  "homeCaloriesOf": "из {goal} ккал",
+  "@homeCaloriesOf": {
+    "placeholders": { "goal": { "type": "int" } }
+  },
+  "homeRemaining": "Осталось: {n} ккал",
+  "@homeRemaining": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "homeSetupProfile": "Настройте профиль ▸",
+  "homeMeals": "Приёмы пищи",
+  "homeMealsCount": "{n} записей",
+  "@homeMealsCount": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "homeEmpty": "Нет записей о еде",
+  "homeEmptyHint": "Нажмите «Добавить еду» или\nсделайте фото блюда",
+  "homeAddFood": "Добавить еду",
+  "homeMacroOf": "из {goal} г",
+  "@homeMacroOf": {
+    "placeholders": { "goal": { "type": "int" } }
+  },
+
+  "cameraTitle": "Распознавание еды",
+  "cameraHint": "Наведите камеру\nна блюдо",
+  "cameraAnalyzing": "Анализирую блюдо...",
+  "cameraProcessing": "ML-модель обрабатывает изображение",
+  "cameraCheckServer": "Проверяю сервер...",
+  "cameraSending": "Отправляю изображение...",
+  "cameraWarmingUp": "Модель прогревается, попытка {n}/3...",
+  "@cameraWarmingUp": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "cameraRecognized": "Распознано:",
+  "cameraConfidence": "Точность: {n}%",
+  "@cameraConfidence": {
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "cameraAlternatives": "Не то блюдо? Выбери правильный вариант:",
+  "cameraTryAgain": "Повторить",
+  "cameraAddToDiary": "Добавить в дневник",
+  "cameraTakePhoto": "Сфотографировать",
+  "cameraGallery": "Выбрать из галереи",
+  "cameraErrorNoBackend": "Backend не запущен.\n\nЗапусти сервер:\ncd backend && python -m uvicorn main:app --reload",
+  "cameraErrorTimeout": "Превышено время ожидания. Попробуй ещё раз через 30 секунд.",
+  "cameraErrorConnection": "Ошибка подключения. Проверь что backend запущен.",
+  "cameraRetry": "Попробовать снова",
+  "cameraOfflineMode": "Офлайн-режим",
+
+  "statsTitle": "Статистика",
+  "statsAverage": "Среднее",
+  "statsGoal": "Цель",
+  "statsDaysLogged": "Дней\nзаписей",
+  "statsChartTitle": "Калории за 7 дней",
+  "statsOnTrack": "В норме",
+  "statsOverGoal": "Превышение",
+  "statsByDay": "По дням",
+  "statsToday": "Сегодня",
+
+  "profileTitle": "Профиль",
+  "profileSave": "Сохранить",
+  "profilePersonal": "Личные данные",
+  "profileName": "Имя",
+  "profileAge": "Возраст",
+  "profileWeight": "Вес (кг)",
+  "profileHeight": "Рост (см)",
+  "profileMale": "Мужской",
+  "profileFemale": "Женский",
+  "profileActivity": "Уровень активности",
+  "profileCalorieGoal": "Ваша норма калорий:",
+  "profileActivitySedentary": "Сидячий образ жизни",
+  "profileActivityLight": "Лёгкая активность (1-3 раза/нед)",
+  "profileActivityModerate": "Умеренная (3-5 раз/нед)",
+  "profileActivityActive": "Высокая (6-7 раз/нед)",
+  "profileActivityVeryActive": "Очень высокая (спортсмен)",
+
+  "settingsLanguage": "Язык",
+  "settingsLangRu": "Русский",
+  "settingsLangKk": "Қазақша",
+  "settingsLangEn": "English",
+  "settingsTheme": "Тема оформления",
+  "settingsThemeSystem": "Системная",
+  "settingsThemeLight": "Светлая",
+  "settingsThemeDark": "Тёмная",
+
+  "addFoodTitle": "Добавить еду",
+  "addFoodSearch": "Поиск продукта...",
+  "addFoodServing": "Порция (г)",
+  "addFoodAdd": "Добавить в дневник",
+  "addFoodSelectFirst": "Выберите продукт",
+
+  "validRequired": "Обязательное поле",
+  "validPositive": "Введите положительное число"
+}
