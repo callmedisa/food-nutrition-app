@@ -7,9 +7,13 @@ import '../../../nutrition/domain/entities/food_product.dart';
 import '../../domain/entities/classification_result.dart';
 
 class ApiDataSource {
+  // IP сервера передаётся при запуске: flutter run --dart-define=API_HOST=192.168.1.5
+  // По умолчанию используется localhost (для эмулятора/симулятора).
+  static const String _apiHost = String.fromEnvironment('API_HOST', defaultValue: 'localhost');
+
   String get _baseUrl {
     if (kIsWeb) return 'http://${Uri.base.host}:8000';
-    return 'http://localhost:8000';
+    return 'http://$_apiHost:8000';
   }
 
   Future<bool> isAvailable() async {

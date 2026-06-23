@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+
+import 'db_factory_stub.dart' if (dart.library.html) 'db_factory_web.dart';
 
 class DatabaseHelper {
   static Database? _db;
@@ -10,6 +13,12 @@ class DatabaseHelper {
   }
 
   static Future<Database> _initDb() async {
+    initDatabaseFactory();
+    // На вебе нет файловой системы — getDatabasesPath() недоступен,
+    // достаточно просто имени (хранится в IndexedDB через WASM-движок).
+    if (kIsWeb) {
+      return openDatabase('nutriscan.db', version: 1, onCreate: _onCreate);
+    }
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, 'nutriscan.db');
     return openDatabase(path, version: 1, onCreate: _onCreate);
