@@ -10,7 +10,10 @@
 """
 
 import ssl
-ssl._create_default_https_context = ssl._create_unverified_context  # macOS Python 3.14 fix
+import certifi
+# В Python с python.org на macOS нет корневых сертификатов, и загрузка весов
+# ImageNet падала. Берём сертификаты из certifi, а не отключаем проверку.
+ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
 
 import json
 import time
