@@ -1,6 +1,5 @@
 import os
 import io
-import ssl
 import json
 import requests
 import torch
@@ -13,7 +12,6 @@ from PIL import Image, ImageEnhance
 from collections import defaultdict
 from torchvision import transforms, models
 
-ssl._create_default_https_context = ssl._create_unverified_context
 
 app = FastAPI(title="NutriScan API")
 
